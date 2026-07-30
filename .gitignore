@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+
+# Generated data - re-derivable by running the pipeline (see README)
+data/parsed/
+data/qoq/
