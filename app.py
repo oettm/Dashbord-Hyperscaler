@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import streamlit as st
 
 from dashboard_app.utils import get_data
-from dashboard_app.views import business_units_view, company_view, cross_company_view, notes_view
+from dashboard_app.views import business_units_view, company_view, cross_company_view, map_view, notes_view
 
 st.set_page_config(page_title="Earnings QoQ Dashboard", layout="wide")
 
@@ -25,7 +25,7 @@ if not comparison:
 
 page = st.sidebar.radio(
     "View",
-    ["Per-company", "Cross-company", "Business units", "Qualitative notes"],
+    ["Per-company", "Cross-company", "Business units", "Map", "Qualitative notes"],
 )
 
 st.sidebar.markdown("---")
@@ -39,5 +39,7 @@ elif page == "Cross-company":
     cross_company_view.render(cross_company)
 elif page == "Business units":
     business_units_view.render(comparison)
+elif page == "Map":
+    map_view.render()
 elif page == "Qualitative notes":
     notes_view.render(comparison)

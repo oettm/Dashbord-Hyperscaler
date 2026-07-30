@@ -68,3 +68,55 @@ BUSINESS_UNIT_DESCRIPTIONS = {
 }
 
 DOC_TYPES = ("press_release", "presentation", "transcript", "financial_statement", "other")
+
+# Static reference data for the "Map" view: HQ + a representative set of
+# production/manufacturing sites per company. This is manually curated public
+# information (company investor-relations / newsroom pages, current as of
+# mid-2026) - it is NOT derived from the earnings documents, and for
+# companies with dozens of sites (Vertiv: ~30 manufacturing/assembly
+# facilities in 40+ countries; Microsoft/Google: hundreds of data centers)
+# this is a representative subset, not an exhaustive list. Update by hand if
+# a site closes/opens or a new company is added.
+FACILITIES = {
+    "ASML": [
+        {"name": "Veldhoven", "type": "HQ + Manufacturing", "country": "Netherlands", "lat": 51.4204, "lon": 5.4048},
+        {"name": "San Diego, CA", "type": "Manufacturing (EUV/DUV light sources)", "country": "USA", "lat": 32.7157, "lon": -117.1611},
+        {"name": "Wilton, CT", "type": "Manufacturing & R&D (mechatronics, optics)", "country": "USA", "lat": 41.1954, "lon": -73.4370},
+        {"name": "Linkou", "type": "Manufacturing (reticle handlers, YieldStar)", "country": "Taiwan", "lat": 25.0839, "lon": 121.3654},
+        {"name": "Tainan", "type": "R&D & Manufacturing (HMI e-beam)", "country": "Taiwan", "lat": 22.9997, "lon": 120.2270},
+    ],
+    "TSMC": [
+        {"name": "Hsinchu", "type": "HQ + Fabs", "country": "Taiwan", "lat": 24.8138, "lon": 120.9675},
+        {"name": "Tainan", "type": "Fabs 14/18 (advanced nodes)", "country": "Taiwan", "lat": 22.9997, "lon": 120.2270},
+        {"name": "Taichung", "type": "Fab 15 (+ Fab 25 under construction)", "country": "Taiwan", "lat": 24.1477, "lon": 120.6736},
+        {"name": "Kaohsiung", "type": "Fab 22", "country": "Taiwan", "lat": 22.6273, "lon": 120.3014},
+        {"name": "Phoenix, AZ", "type": "Fab 21", "country": "USA", "lat": 33.4484, "lon": -112.0740},
+        {"name": "Kumamoto", "type": "Fab (JASM)", "country": "Japan", "lat": 32.8032, "lon": 130.7079},
+        {"name": "Dresden", "type": "Fab (ESMC, under construction)", "country": "Germany", "lat": 51.0504, "lon": 13.7373},
+    ],
+    "Microsoft": [
+        {"name": "Redmond, WA", "type": "HQ", "country": "USA", "lat": 47.6740, "lon": -122.1215},
+        {"name": "Quincy, WA", "type": "Data center", "country": "USA", "lat": 47.2343, "lon": -119.8524},
+        {"name": "Boydton, VA", "type": "Data center", "country": "USA", "lat": 36.6676, "lon": -78.3819},
+        {"name": "San Antonio, TX", "type": "Data center", "country": "USA", "lat": 29.4241, "lon": -98.4936},
+        {"name": "Mount Pleasant, WI", "type": "Data center (Fairwater - largest AI campus)", "country": "USA", "lat": 42.7261, "lon": -87.8834},
+        {"name": "Dublin", "type": "Data center", "country": "Ireland", "lat": 53.3498, "lon": -6.2603},
+    ],
+    "Google/Alphabet": [
+        {"name": "Mountain View, CA", "type": "HQ (Googleplex)", "country": "USA", "lat": 37.4220, "lon": -122.0841},
+        {"name": "The Dalles, OR", "type": "Data center", "country": "USA", "lat": 45.5946, "lon": -121.1787},
+        {"name": "Council Bluffs, IA", "type": "Data center", "country": "USA", "lat": 41.2619, "lon": -95.8608},
+        {"name": "St. Ghislain", "type": "Data center", "country": "Belgium", "lat": 50.4542, "lon": 3.8189},
+        {"name": "Hamina", "type": "Data center", "country": "Finland", "lat": 60.5696, "lon": 27.1978},
+        {"name": "Singapore", "type": "Data center", "country": "Singapore", "lat": 1.3521, "lon": 103.8198},
+        {"name": "Changhua County", "type": "Data center", "country": "Taiwan", "lat": 24.0518, "lon": 120.5161},
+    ],
+    "Vertiv": [
+        {"name": "Westerville, OH", "type": "HQ", "country": "USA", "lat": 40.1262, "lon": -82.9291},
+        {"name": "Ironton, OH", "type": "Manufacturing", "country": "USA", "lat": 38.5320, "lon": -82.6821},
+        {"name": "Lincoln, NE", "type": "Manufacturing (power distribution)", "country": "USA", "lat": 40.8136, "lon": -96.7026},
+        {"name": "Neuhausen am Rheinfall", "type": "Regional HQ (EMEA)", "country": "Switzerland", "lat": 47.6890, "lon": 8.6156},
+        {"name": "Shenzhen", "type": "Regional HQ (APAC)", "country": "China", "lat": 22.5431, "lon": 114.0579},
+        {"name": "Thane", "type": "Manufacturing & Regional office", "country": "India", "lat": 19.2183, "lon": 72.9781},
+    ],
+}

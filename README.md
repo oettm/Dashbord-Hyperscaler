@@ -70,7 +70,7 @@ is currently in `data/parsed/`, so just re-run it after any `run_pipeline` run.
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Four views in the sidebar:
+Opens at `http://localhost:8501`. Five views in the sidebar:
 
 - **Per-company** - headline KPI tiles + full Q1-vs-Q2 KPI table for one company.
 - **Cross-company** - pick a KPI, see every company ranked by Q1 level, Q2
@@ -79,6 +79,16 @@ Opens at `http://localhost:8501`. Four views in the sidebar:
   revenue/operating income/margin, and any outlook mentioned for it (falls
   back to company-level guidance, labeled as such, when a document doesn't
   break guidance out by segment).
+- **Map** - HQ and production/data-center sites for all five companies on a
+  world map (color = company, larger marker = HQ), plus a table of every
+  site. This data is **manually curated from public sources** (company
+  newsroom/investor pages), not extracted from the earnings documents, and
+  for companies with dozens-to-hundreds of sites (Vertiv, Microsoft, Google)
+  it's a representative subset rather than exhaustive. To add/edit sites,
+  update `FACILITIES` in `pipeline/config.py` - each entry is
+  `{"name", "type", "country", "lat", "lon"}`; a new company needs a new key
+  in that dict, using the same company name as everywhere else in the
+  pipeline (`COMPANY_FOLDER_MAP`'s canonical name).
 - **Qualitative notes** - management commentary quotes pulled from the press
   releases/transcripts, Q1 next to Q2.
 
@@ -131,7 +141,7 @@ just refresh the browser tab - no restart needed.
 ```
 dashboard/
   pipeline/
-    config.py        paths, company-folder normalization, BU descriptions
+    config.py        paths, company-folder normalization, BU descriptions, FACILITIES (map data)
     discover.py       walks the source folder, classifies every file
     extract_text.py   PDF/PPTX text extraction, file hashing
     parsers/          one module per company (asml, google, tsmc, vertiv, msft) + common.py helpers
