@@ -1,6 +1,13 @@
 import streamlit as st
 
 
+def _safe(note: str) -> str:
+    # Streamlit's markdown renderer treats a "$...$" pair as inline LaTeX;
+    # commentary quotes routinely contain bare dollar amounts (e.g. "$250M"),
+    # so escape "$" or a stray one turns half a sentence into a math block.
+    return note.replace("$", "\\$")
+
+
 def render(comparison: dict):
     st.header("Qualitative notes: management commentary")
 
@@ -16,7 +23,7 @@ def render(comparison: dict):
         if not q1_notes:
             st.write("No commentary extracted.")
         for note in q1_notes:
-            st.markdown(f"> {note}")
+            st.markdown(f"> {_safe(note)}")
             st.write("")
     with col2:
         st.subheader("Q2")
@@ -27,5 +34,5 @@ def render(comparison: dict):
             if not q2_notes:
                 st.write("No commentary extracted.")
             for note in q2_notes:
-                st.markdown(f"> {note}")
+                st.markdown(f"> {_safe(note)}")
                 st.write("")

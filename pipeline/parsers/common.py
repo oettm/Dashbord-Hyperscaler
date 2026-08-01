@@ -63,6 +63,23 @@ def find_two(text: str, label: str, flags=re.I | re.M) -> tuple[Optional[float],
     return to_number(m.group(1)), to_number(m.group(2))
 
 
+def find_last_in_run(text: str, label: str, flags=re.I | re.M) -> Optional[float]:
+    """Find `label` followed by a run of one-number-per-line values (as in a
+    trailing-quarters trend table, e.g. '1Q25 2Q25 3Q25 ... 2Q26' columns)
+    and return the LAST one - i.e. the most recent quarter. Robust to the
+    run growing by a column every quarter, since it just takes whatever the
+    last number in the run happens to be."""
+    m = re.search(
+        r"^[ \t.]*" + re.escape(label) + r"\s*\n((?:[ \t]*\$?\(?-?[\d,.]+\)?%?[ \t]*\n)+)",
+        text,
+        flags,
+    )
+    if not m:
+        return None
+    nums = re.findall(r"\(?-?[\d,.]+\)?%?", m.group(1))
+    return to_number(nums[-1]) if nums else None
+
+
 def find_sentence(text: str, keyword: str, window: int = 400) -> Optional[str]:
     """Grab a short passage around the first occurrence of `keyword`, trimmed
     to sentence-ish boundaries, for use as qualitative commentary."""

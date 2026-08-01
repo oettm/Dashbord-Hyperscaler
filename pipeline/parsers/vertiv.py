@@ -7,10 +7,15 @@ table (label, then five columns: this-year, prior-year, delta, delta%,
 organic delta% - we only need the first, 'this-year', column).
 """
 import re
-from .common import to_number, find_sentence
+from .common import to_number, find_sentence, find_last_in_run
 
 CURRENCY = "USD"
 _REGIONS = ["AMER", "APAC", "EMEA"]
+
+# Row labels used in the results-presentation appendix's trailing-quarters
+# trend tables ("Non-GAAP financial measures: Qx 2025 - Qx 2026 results")
+# map to our canonical region names.
+_PRES_REGION_LABELS = {"AMER": "Americas", "APAC": "Asia Pacific", "EMEA": "Europe, Middle East & Africa"}
 
 
 def parse_press_release(text: str) -> dict:
@@ -94,8 +99,96 @@ def parse_press_release(text: str) -> dict:
     return {"kpis": kpis, "business_units": business_units, "guidance": guidance, "commentary": commentary}
 
 
+def _section(text: str, start_anchor: str, end_anchor: str = None, from_last: bool = False) -> str:
+    """Slice text between two anchors (end_anchor optional -> to end of text).
+    from_last=True splits on the LAST occurrence of start_anchor, used when an
+    anchor appears twice (once in a front chart slide, once in the cleaner
+    appendix table - we want the appendix version, which comes later)."""
+    parts = text.split(start_anchor)
+    if len(parts) < 2:
+        return ""
+    chunk = parts[-1] if from_last else parts[1]
+    if end_anchor:
+        chunk = chunk.split(end_anchor, 1)[0]
+    return chunk
+
+
 def parse_presentation(text: str) -> dict:
-    return {"kpis": {}, "business_units": [], "guidance": {}, "commentary": []}
+    """Vertiv's results presentation - used standalone for Q2 in this dataset
+    (no press release was provided). KPIs are pulled from the appendix's
+    'Non-GAAP financial measures: Qx 2025 - Qx 2026 results' trailing-quarter
+    trend tables (label, then one number per quarter column - we take the
+    last, i.e. most recent, column) rather than the front summary chart
+    slides, whose text extraction order doesn't follow visual reading order.
+    """
+    kpis = {"currency": CURRENCY}
+
+    net_sales_block = _section(text, "Net Sales(1)", "Adjusted operating margins")
+    adj_op_profit_block = _section(text, "Adjusted operating profit (loss)(2)", "Net Sales(1)")
+    margin_block = _section(text, "Adjusted operating margins(4)", "©")
+    gaap_op_profit_block = _section(text, "Total corporate and other", from_last=True)
+    cash_flow_block = _section(text, "Reconciliation of net cash provided by (used for)",
+                                from_last=True)
+
+    kpis["revenue"] = find_last_in_run(net_sales_block, "Total")
+    kpis["adjusted_operating_profit"] = find_last_in_run(adj_op_profit_block, "Adjusted operating profit (loss) Total")
+    kpis["adjusted_operating_margin_pct"] = find_last_in_run(margin_block, "Vertiv")
+    kpis["operating_profit"] = find_last_in_run(gaap_op_profit_block, "Operating profit (loss)")
+    kpis["operating_cash_flow"] = find_last_in_run(cash_flow_block, "Net cash provided by (used for) operating activities")
+    kpis["adjusted_free_cash_flow"] = find_last_in_run(cash_flow_block, "Adjusted free cash flow")
+
+    m = re.search(r"[Nn]et leverage:?\s*(?:of|was approximately)?\s*~?\(?(-?[\d.]+)\)?x", text)
+    if m:
+        kpis["net_leverage_x"] = to_number(m.group(1))
+    m = re.search(r"adjusted diluted earnings per share of \$([\d.]+)", text, re.I)
+    if m:
+        kpis["adjusted_diluted_eps"] = to_number(m.group(1))
+
+    business_units = []
+    for region, pres_label in _PRES_REGION_LABELS.items():
+        # the Net Sales table uses the short "EMEA" label while the profit/
+        # margin tables spell out "Europe, Middle East & Africa" - try both.
+        sales = find_last_in_run(net_sales_block, pres_label) or find_last_in_run(net_sales_block, region)
+        op_profit = find_last_in_run(adj_op_profit_block, pres_label) or find_last_in_run(adj_op_profit_block, region)
+        margin = find_last_in_run(margin_block, pres_label) or find_last_in_run(margin_block, region)
+        if sales is not None:
+            business_units.append({
+                "name": region,
+                "revenue": sales,
+                "operating_income": op_profit,
+                "operating_margin_pct": margin,
+                "currency": CURRENCY,
+            })
+
+    # Guidance: each "financial guidance" slide lists its metrics' "Range:"
+    # lines in a fixed order (Net Sales, Adj. Op Profit, Adj. Op Margin,
+    # Adj. Diluted EPS[, Adj. Free Cash Flow for the full-year slide]).
+    guidance = {}
+    q3_block = _section(text, "Third quarter 2026 financial guidance", "Full year 2026 financial guidance")
+    fy_block = _section(text, "Full year 2026 financial guidance", "Non-GAAP financial measures")
+    range_pattern = r"Range:\s*\$?([\d,.]+)%?M?\s*-\s*\$?([\d,.]+)%?M?"
+    q3_ranges = re.findall(range_pattern, q3_block)
+    fy_ranges = re.findall(range_pattern, fy_block)
+    if len(q3_ranges) >= 4:
+        guidance["next_quarter_net_sales_usd_mn"] = [to_number(x) for x in q3_ranges[0]]
+        guidance["next_quarter_adjusted_operating_profit_usd_mn"] = [to_number(x) for x in q3_ranges[1]]
+        guidance["next_quarter_adjusted_operating_margin_pct"] = [to_number(x) for x in q3_ranges[2]]
+        guidance["next_quarter_adjusted_diluted_eps"] = [to_number(x) for x in q3_ranges[3]]
+    if len(fy_ranges) >= 4:
+        guidance["full_year_net_sales_usd_mn"] = [to_number(x) for x in fy_ranges[0]]
+        guidance["full_year_adjusted_operating_profit_usd_mn"] = [to_number(x) for x in fy_ranges[1]]
+        guidance["full_year_adjusted_operating_margin_pct"] = [to_number(x) for x in fy_ranges[2]]
+        guidance["full_year_adjusted_diluted_eps"] = [to_number(x) for x in fy_ranges[3]]
+    if len(fy_ranges) >= 5:
+        guidance["full_year_adjusted_free_cash_flow_usd_mn"] = [to_number(x) for x in fy_ranges[4]]
+
+    commentary = []
+    for kw in ["Second quarter net sales up", "Raising full year 2026 net sales guidance"]:
+        s = find_sentence(text, kw, window=450)
+        if s:
+            commentary.append(s)
+
+    return {"kpis": kpis, "business_units": business_units, "guidance": guidance, "commentary": commentary}
 
 
 def parse(doc_type: str, text: str) -> dict:
