@@ -1,6 +1,7 @@
 import streamlit as st
 
-from ..utils import HEADLINE_KPIS, NA, fmt_delta, fmt_number, kpi_label
+from ..prices import price_and_pe
+from ..utils import NA, essential_kpi_keys, fmt_delta, fmt_number, kpi_label
 
 
 def render(comparison: dict, records: dict):
@@ -14,12 +15,11 @@ def render(comparison: dict, records: dict):
     if not comp["q2_available"]:
         st.info(f"**Q2 is not available for {company}** in this dataset - showing Q1 only where noted.")
 
-    st.subheader("Headline KPIs")
-    headline_keys = [k for k in HEADLINE_KPIS if k in kpis] or list(kpis)[:6]
-    cols = st.columns(min(len(headline_keys), 4) or 1)
-    for i, key in enumerate(headline_keys):
+    keys = essential_kpi_keys(kpis)
+    cols = st.columns(4)
+    for i, key in enumerate(keys):
         row = kpis[key]
-        with cols[i % len(cols)]:
+        with cols[i % 4]:
             q1_display = fmt_number(row["q1"])
             if row["q2"] == NA:
                 st.metric(kpi_label(key), q1_display, "Q2: not available", delta_color="off")
@@ -27,29 +27,17 @@ def render(comparison: dict, records: dict):
                 st.metric(kpi_label(key), fmt_number(row["q2"]), fmt_delta(row))
                 st.caption(f"Q1: {q1_display}")
 
-    st.subheader("Full KPI comparison")
-    table_rows = []
-    for key, row in sorted(kpis.items()):
-        table_rows.append({
-            "KPI": kpi_label(key),
-            "Q1": fmt_number(row["q1"]),
-            "Q2": fmt_number(row["q2"]) if row["q2"] != NA else NA,
-            "Δ abs": fmt_number(row["abs_delta"]) if row["abs_delta"] is not None else "—",
-            "Δ %": f"{row['pct_delta']:+.1f}%" if row["pct_delta"] is not None else "—",
-        })
-    st.dataframe(table_rows, use_container_width=True, hide_index=True)
-
-    guidance = comp.get("guidance", {})
-    if guidance.get("q1") or guidance.get("q2"):
-        st.subheader("Guidance")
-        g1, g2 = st.columns(2)
-        with g1:
-            st.markdown("**As of Q1**")
-            st.json(guidance.get("q1") or {}, expanded=False)
-        with g2:
-            st.markdown("**As of Q2**" if comp["q2_available"] else "**As of Q2** — not available")
-            st.json(guidance.get("q2") or {}, expanded=False)
-
-    with st.expander("Source documents used for this company"):
-        st.write("Q1:", comp["source_files"]["q1"] or "—")
-        st.write("Q2:", comp["source_files"]["q2"] or NA)
+    # P/E: live price (yfinance) / annualized quarterly EPS - not a KPI from
+    # the earnings documents, computed on the fly and clearly labeled as an
+    # approximation (quarterly EPS x4 stands in for trailing-twelve-months).
+    eps_key = next((k for k in ["diluted_eps", "eps_basic", "eps_usd_per_adr"] if k in kpis), None)
+    if eps_key:
+        current_eps = kpis[eps_key]["q2"] if kpis[eps_key]["q2"] != NA else kpis[eps_key]["q1"]
+        price, pe = price_and_pe(company, current_eps if isinstance(current_eps, (int, float)) else None)
+        with cols[len(keys) % 4]:
+            if pe is not None:
+                st.metric("P/E (approx.)", f"{pe}x")
+                st.caption(f"Price {fmt_number(price)} / EPS x4")
+            else:
+                st.metric("P/E (approx.)", "not available")
+                st.caption("No live price (offline or ticker unavailable)")

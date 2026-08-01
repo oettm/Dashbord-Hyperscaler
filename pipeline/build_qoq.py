@@ -20,6 +20,8 @@ DOC_TYPE_PRIORITY = {"press_release": 0, "financial_statement": 1, "presentation
 _TSMC_NTD_TO_USD_KEYS = {
     "operating_cash_flow_ntd_mn": "operating_cash_flow",
     "net_cash_ntd_bn": "net_cash",  # -> USD millions
+    "capex_ntd_mn": "capex",
+    "free_cash_flow_ntd_mn": "free_cash_flow",
 }
 
 

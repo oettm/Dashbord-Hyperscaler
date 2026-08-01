@@ -7,7 +7,7 @@ table (label, then five columns: this-year, prior-year, delta, delta%,
 organic delta% - we only need the first, 'this-year', column).
 """
 import re
-from .common import to_number, find_sentence, find_last_in_run
+from .common import to_number, find_sentence, find_last_in_run, find_two
 
 CURRENCY = "USD"
 _REGIONS = ["AMER", "APAC", "EMEA"]
@@ -49,6 +49,19 @@ def parse_press_release(text: str) -> dict:
     m = re.search(r"net leverage (?:of|was approximately) ~?([\d.]+)x", text, re.I)
     if m:
         kpis["net_leverage_x"] = to_number(m.group(1))
+
+    # Vertiv's own income-statement/cash-flow tables list the CURRENT year
+    # FIRST then the prior year (e.g. "March 31, 2026 ... March 31, 2025"),
+    # opposite of the (prior, current) convention find_two assumes elsewhere
+    # (ASML/Google use prior-then-current) - so we take the first value here.
+    diluted_eps, _ = find_two(text, "Diluted")
+    if diluted_eps is not None:
+        kpis["diluted_eps"] = diluted_eps
+    capex, _ = find_two(text, "Capital expenditures")
+    if capex is not None:
+        kpis["capex"] = -abs(capex)
+        if "operating_cash_flow" in kpis:
+            kpis["free_cash_flow"] = round(kpis["operating_cash_flow"] + kpis["capex"], 1)
 
     # regional segment table: label, Net sales value (this year), then more columns we ignore
     business_units = []
@@ -136,6 +149,11 @@ def parse_presentation(text: str) -> dict:
     kpis["operating_profit"] = find_last_in_run(gaap_op_profit_block, "Operating profit (loss)")
     kpis["operating_cash_flow"] = find_last_in_run(cash_flow_block, "Net cash provided by (used for) operating activities")
     kpis["adjusted_free_cash_flow"] = find_last_in_run(cash_flow_block, "Adjusted free cash flow")
+    capex = find_last_in_run(cash_flow_block, "Less: Capital expenditures")
+    if capex is not None:
+        kpis["capex"] = -abs(capex)
+        if kpis.get("operating_cash_flow") is not None:
+            kpis["free_cash_flow"] = round(kpis["operating_cash_flow"] + kpis["capex"], 1)
 
     m = re.search(r"[Nn]et leverage:?\s*(?:of|was approximately)?\s*~?\(?(-?[\d.]+)\)?x", text)
     if m:
@@ -143,6 +161,13 @@ def parse_presentation(text: str) -> dict:
     m = re.search(r"adjusted diluted earnings per share of \$([\d.]+)", text, re.I)
     if m:
         kpis["adjusted_diluted_eps"] = to_number(m.group(1))
+    # GAAP diluted EPS lives in the "Diluted EPS(1) / GAAP / <6 values>" row of
+    # the per-quarter (not trailing-trend) reconciliation table - last value.
+    m = re.search(r"Diluted EPS\(1\)\s*\nGAAP\s*\n((?:[ \t]*\$?-?[\d,.]+\s*\n){3,8})", text, re.I)
+    if m:
+        nums = re.findall(r"-?[\d,.]+", m.group(1))
+        if nums:
+            kpis["diluted_eps"] = to_number(nums[-1])
 
     business_units = []
     for region, pres_label in _PRES_REGION_LABELS.items():

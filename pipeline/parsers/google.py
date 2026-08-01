@@ -36,6 +36,9 @@ def parse_press_release(text: str) -> dict:
 
     _, ocf = find_two(text, "Net cash provided by operating activities")
     _, capex = find_two(text, "Purchases of property and equipment")
+    _, cost_of_revenue = find_two(text, "Cost of revenues")
+    _, total_debt = find_two(text, "Long-term debt")
+    _, cash_and_marketable = find_two(text, "Total cash, cash equivalents, and marketable securities")
 
     fcf = None
     if ocf is not None and capex is not None:
@@ -45,15 +48,32 @@ def parse_press_release(text: str) -> dict:
     if op_income is not None and revenue:
         op_margin = round(op_income / revenue * 100, 1)
 
+    gross_profit = gross_margin_pct = None
+    if cost_of_revenue is not None and revenue:
+        gross_profit = round(revenue - cost_of_revenue, 1)
+        gross_margin_pct = round(gross_profit / revenue * 100, 1)
+
+    net_debt = None
+    if total_debt is not None and cash_and_marketable is not None:
+        net_debt = round(total_debt - cash_and_marketable, 1)  # negative = net cash
+
+    m = re.search(r"EPS increased [\d.]+%\s*to\s*\$(\d+\.\d+)", text, re.I)
+    eps = float(m.group(1)) if m else None
+
     kpis = {
         "revenue": revenue,
         "currency": CURRENCY,
+        "cost_of_revenue": cost_of_revenue,
+        "gross_profit": gross_profit,
+        "gross_margin_pct": gross_margin_pct,
         "operating_income": op_income,
         "operating_margin_pct": op_margin,
         "net_income": net_income,
+        "diluted_eps": eps,
         "operating_cash_flow": ocf,
         "capex": capex,
         "free_cash_flow": fcf,
+        "net_debt": net_debt,
     }
 
     business_units = []
@@ -97,10 +117,13 @@ def parse_press_release(text: str) -> dict:
 
 _PROSE_PATTERNS = {
     "revenue": r"Consolidated revenues were \$([\d.]+)\s*billion",
+    "cost_of_revenue": r"Total cost of revenues was \$([\d.]+)\s*billion",
     "operating_income": r"Operating income increased [\d.]+%\s*to\s*\$([\d.]+)\s*billion",
     "operating_cash_flow": r"operating cash flow of \$([\d.]+)\s*billion in the second quarter",
     "capex": r"CapEx was \$([\d.]+)\s*billion in the second quarter",
     "free_cash_flow": r"(?:negative )?free cash flow of (?:-?\$)?([\d.]+)\s*billion in the second quarter",
+    "cash_and_marketable": r"\$([\d.]+)\s*billion in cash and marketable securities",
+    "total_debt": r"[Ll]ong.term debt was \$([\d.]+)\s*billion",
 }
 
 _BU_PROSE_PATTERNS = {
@@ -132,9 +155,24 @@ def parse_transcript_as_financials(text: str) -> dict:
             kpis[key] = round(val * 1000, 1)  # billions -> millions, consistent with press-release units
     if "operating_income" in kpis and kpis.get("revenue"):
         kpis["operating_margin_pct"] = round(kpis["operating_income"] / kpis["revenue"] * 100, 1)
+    if "cost_of_revenue" in kpis and kpis.get("revenue"):
+        gross_profit = round(kpis["revenue"] - kpis["cost_of_revenue"], 1)
+        kpis["gross_profit"] = gross_profit
+        kpis["gross_margin_pct"] = round(gross_profit / kpis["revenue"] * 100, 1)
     # free cash flow stated as "negative free cash flow of $5.9 billion" -> negative
     if re.search(r"negative free cash flow", text, re.I) and "free_cash_flow" in kpis:
         kpis["free_cash_flow"] = -kpis["free_cash_flow"]
+    if "capex" in kpis:
+        kpis["capex"] = -kpis["capex"]  # outflow, matches the sign convention used elsewhere
+    # net_debt: derived from two prose-only intermediates, not KPIs in their own right
+    cash_and_marketable = kpis.pop("cash_and_marketable", None)
+    total_debt = kpis.pop("total_debt", None)
+    if cash_and_marketable is not None and total_debt is not None:
+        kpis["net_debt"] = round(total_debt - cash_and_marketable, 1)  # negative = net cash
+
+    m = re.search(r"\$(\d+\.\d{2})\b", text)  # diluted EPS is the only "$X.XX" figure stated in the transcript
+    if m:
+        kpis["diluted_eps"] = float(m.group(1))
 
     business_units = []
     for name, (rev_pat, op_pat) in _BU_PROSE_PATTERNS.items():
@@ -170,7 +208,17 @@ def parse_transcript_as_financials(text: str) -> dict:
 
 
 def parse_presentation(text: str) -> dict:
-    return {"kpis": {}, "business_units": [], "guidance": {}, "commentary": []}
+    """The earnings slides deck restates diluted EPS as the only "$X.XX"
+    (two-decimal dollar) figure anywhere on the income-statement slide - a
+    reliable enough anchor to pull it out even though the slide's PDF text
+    order otherwise doesn't follow visual reading order. Used mainly for Q2,
+    where there's no press release to get EPS from directly; harmless for Q1
+    since the press release's own EPS value takes priority when merged."""
+    kpis = {}
+    eps_matches = re.findall(r"\$(\d+\.\d{2})\b", text)
+    if len(eps_matches) == 2:
+        kpis["diluted_eps"] = float(eps_matches[0])
+    return {"kpis": kpis, "business_units": [], "guidance": {}, "commentary": []}
 
 
 def parse(doc_type: str, text: str) -> dict:

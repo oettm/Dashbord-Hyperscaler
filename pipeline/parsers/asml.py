@@ -6,7 +6,7 @@ quarter's number, then the current quarter's number (e.g. 'Total net sales /
 number as the value for the quarter this document is about.
 """
 import re
-from .common import find_two, find_sentence, pct
+from .common import find_two, find_sentence, find_last_in_run, pct
 
 CURRENCY = "EUR"
 
@@ -84,7 +84,23 @@ def parse_presentation(text: str) -> dict:
     # agenda/table-of-contents entry, not the actual outlook slide - not
     # useful as a commentary snippet, so we don't try to extract one here.
     # The press release's CEO quote already covers this quarter's outlook.
-    return {"kpis": {}, "business_units": [], "guidance": {}, "commentary": []}
+    #
+    # The "Consolidated statements of cash flows" slide is a trailing-quarter
+    # trend table (label, then one value per quarter column) - same shape as
+    # Vertiv's appendix tables, so find_last_in_run gets the current quarter.
+    kpis = {}
+    ocf = find_last_in_run(text, "Net cash provided by (used in) operating activities")
+    capex = find_last_in_run(text, "Purchases of property, plant and equipment and intangible assets")
+    if ocf is not None:
+        kpis["operating_cash_flow"] = ocf
+    if capex is not None:
+        kpis["capex"] = capex
+    if ocf is not None and capex is not None:
+        # not read off the deck's own "Free cash flow 1" row: the footnote
+        # marker "1" sits on its own line right after that row's numbers and
+        # would get swept into the run as a bogus extra (wrong) data point.
+        kpis["free_cash_flow"] = round(ocf + capex, 1)  # capex already negative
+    return {"kpis": kpis, "business_units": [], "guidance": {}, "commentary": []}
 
 
 def parse_transcript(text: str) -> dict:

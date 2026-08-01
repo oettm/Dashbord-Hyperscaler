@@ -1,13 +1,13 @@
 import plotly.graph_objects as go
 import streamlit as st
 
-from ..utils import COMPANY_COLORS, NA, fmt_number, kpi_label
+from ..utils import COMPANY_COLORS, CROSS_COMPANY_ESSENTIAL_KEYS, NA, fmt_number, kpi_label
 
 
 def render(cross_company: dict):
     st.header("Cross-company comparison")
 
-    kpi_keys = sorted(cross_company.keys())
+    kpi_keys = [k for k in CROSS_COMPANY_ESSENTIAL_KEYS if k in cross_company]
     default_idx = kpi_keys.index("revenue") if "revenue" in kpi_keys else 0
     key = st.selectbox("KPI", kpi_keys, index=default_idx, format_func=kpi_label)
     rows = cross_company[key]

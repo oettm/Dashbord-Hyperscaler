@@ -70,11 +70,17 @@ is currently in `data/parsed/`, so just re-run it after any `run_pipeline` run.
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Five views in the sidebar:
+Opens at `http://localhost:8501`. Four views in the sidebar:
 
-- **Per-company** - headline KPI tiles + full Q1-vs-Q2 KPI table for one company.
-- **Cross-company** - pick a KPI, see every company ranked by Q1 level, Q2
-  level, or QoQ % growth, plus a grouped bar chart.
+- **Per-company** - exactly seven KPI tiles, Q1 vs Q2: Revenue, Gross margin
+  %, Operating cash flow, Free cash flow, Capex, Net debt (or Net cash /
+  Net leverage - whichever the company actually reports, shown under its
+  own correct label rather than forced into one field with the wrong sign),
+  and EPS - plus an eighth, P/E, computed live (see below). Nothing else is
+  shown; a company missing one of these in its source documents simply
+  skips that tile (e.g. Vertiv doesn't report gross margin).
+- **Cross-company** - pick one of those same KPIs, see every company ranked
+  by Q1 level, Q2 level, or QoQ % growth, plus a grouped bar chart.
 - **Business units** - per company, each segment's description, Q1-vs-Q2
   revenue/operating income/margin, and any outlook mentioned for it (falls
   back to company-level guidance, labeled as such, when a document doesn't
@@ -89,8 +95,15 @@ Opens at `http://localhost:8501`. Five views in the sidebar:
   `{"name", "type", "country", "lat", "lon"}`; a new company needs a new key
   in that dict, using the same company name as everywhere else in the
   pipeline (`COMPANY_FOLDER_MAP`'s canonical name).
-- **Qualitative notes** - management commentary quotes pulled from the press
-  releases/transcripts, Q1 next to Q2.
+
+**P/E**: not extracted from any document - `dashboard_app/prices.py` fetches
+each company's current share price on demand via `yfinance` (cached 1 hour)
+and divides it by quarterly EPS x4, an **approximation** of trailing-twelve-
+months EPS (labeled "P/E (approx.)" in the UI for that reason). Needs
+internet access to Yahoo Finance; if unreachable it shows "not available"
+rather than failing. Ticker mapping is `TICKERS` in `prices.py` - ASML uses
+its Euronext listing (`ASML.AS`, EUR) to match ASML's EUR-denominated EPS;
+TSMC uses the NYSE ADR (`TSM`, USD) to match `eps_usd_per_adr`.
 
 Missing data (a company with no Q2 folder, or a KPI not present in any of a
 quarter's documents) always renders as **"not available"** rather than a

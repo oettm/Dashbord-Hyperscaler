@@ -66,6 +66,14 @@ def parse_workbook(path) -> dict:
     if ocf is not None and capex is not None:
         kpis["free_cash_flow"] = round(ocf + capex, 1)  # capex already negative in this sheet
 
+    # --- Balance Sheets: single-quarter sheet (col B = current quarter = Q1 FY26) ---
+    bs = wb["Balance Sheets"]
+    cash_and_st_investments = bs.cell(row=11, column=2).value
+    current_debt = bs.cell(row=26, column=2).value
+    long_term_debt = bs.cell(row=32, column=2).value
+    if cash_and_st_investments is not None and current_debt is not None and long_term_debt is not None:
+        kpis["net_debt"] = round((current_debt + long_term_debt) - cash_and_st_investments, 1)
+
     # --- Segment Results: single-quarter sheet (col B = current quarter = Q1 FY26) ---
     seg = wb["Segment Results"]
     business_units = []

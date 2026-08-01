@@ -38,6 +38,7 @@ KPI_LABELS = {
     "adjusted_operating_margin_pct": "Adjusted operating margin %",
     "adjusted_free_cash_flow": "Adjusted free cash flow",
     "net_leverage_x": "Net leverage (x)",
+    "net_debt": "Net debt (USD mn)",
     "net_cash": "Net cash (USD mn)",
     "net_cash_ntd_bn": "Net cash (NTD bn)",
     "long_term_debt_ntd_bn": "Long-term debt (NTD bn)",
@@ -54,10 +55,45 @@ KPI_LABELS = {
     "implied_ntd_per_usd": "Implied NTD/USD rate",
 }
 
-# The handful of KPIs worth headlining at the top of the company view, in order.
-HEADLINE_KPIS = [
-    "revenue", "operating_margin_pct", "net_income", "operating_cash_flow", "free_cash_flow", "net_leverage_x",
+# The essentials view shows exactly these seven KPIs (plus a live-computed
+# P/E as an eighth) - nothing else. "Net debt" has three possible source
+# fields depending on the company (Google/MSFT report net_debt directly,
+# TSMC reports the mirror-image net_cash, Vertiv reports a leverage ratio
+# instead of a dollar figure) - each is shown under its own correct label
+# rather than forced into one field name with the wrong sign.
+ESSENTIAL_KPIS = [
+    ("revenue", None),
+    ("gross_margin_pct", None),
+    ("operating_cash_flow", None),
+    ("free_cash_flow", None),
+    ("capex", None),
+    ("net_debt", ["net_debt", "net_cash", "net_leverage_x"]),
+    ("eps", ["diluted_eps", "eps_basic", "eps_usd_per_adr"]),
 ]
+
+
+# Flat version of the same essentials, used to filter the cross-company KPI
+# picker - it can't resolve "whichever field this company happens to use"
+# per row the way the per-company view does, so it just offers every field
+# name that maps to one of the essential concepts.
+CROSS_COMPANY_ESSENTIAL_KEYS = [
+    "revenue", "gross_margin_pct", "operating_cash_flow", "free_cash_flow", "capex",
+    "net_debt", "net_cash", "net_leverage_x",
+    "diluted_eps", "eps_basic", "eps_usd_per_adr",
+]
+
+
+def essential_kpi_keys(kpis: dict) -> list[str]:
+    """Resolve ESSENTIAL_KPIS against one company's kpi dict, returning the
+    actual field name to show for each row (skipping rows with no data at
+    all for this company, e.g. Vertiv has no gross_margin_pct)."""
+    keys = []
+    for primary, candidates in ESSENTIAL_KPIS:
+        for candidate in candidates or [primary]:
+            if candidate in kpis:
+                keys.append(candidate)
+                break
+    return keys
 
 
 def kpi_label(key: str) -> str:
