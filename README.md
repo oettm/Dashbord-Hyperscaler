@@ -149,6 +149,56 @@ just refresh the browser tab - no restart needed.
   dependency for one company's supplementary slides when its numbers are
   already fully covered by the XLSX.
 
+## Stock tracker (separate, auto-updating, GitHub Pages)
+
+A second, independent piece: a static page with daily stock-price charts for
+the five companies (one combined chart, indexed to 100 so wildly different
+price scales stay comparable, plus one chart per company), rebuilt every day
+by a GitHub Actions workflow and served at a stable GitHub Pages URL. It does
+not read anything from `data/` or use the Streamlit app - it's its own
+self-contained pipeline under `stocks/`.
+
+**One-time setup (you do this, not me - it needs your GitHub account and a
+Twelve Data account):**
+
+1. Create a free account at [twelvedata.com](https://twelvedata.com) and
+   copy your API key (free tier: 800 calls/day; this uses 5/day).
+2. Push this repo to GitHub (see the git remote already configured -
+   `git push -u origin main`, authenticating with a personal access token
+   when prompted).
+3. On GitHub: **Settings → Secrets and variables → Actions → New repository
+   secret**, name it `TWELVE_DATA_API_KEY`, paste the key.
+4. **Settings → Pages → Source: Deploy from a branch → Branch: `main`,
+   folder: `/docs`** → Save.
+5. **Actions tab → "Update stock prices" → Run workflow** (the manual
+   `workflow_dispatch` trigger) to populate the page immediately, instead of
+   waiting for the next scheduled run.
+6. Your link: `https://<your-github-username>.github.io/<repo-name>/` (GitHub
+   shows the exact URL under Settings → Pages once it's live). Bookmark it -
+   that's the "always up to date" link; nothing else needs to be reopened.
+
+After that, `.github/workflows/update_stocks.yml` runs on its own every day
+at 05:00 UTC (`workflow_dispatch` also still works any time from the Actions
+tab) - fetches prices, rebuilds `docs/index.html`, commits and pushes only if
+the data changed. No further action needed unless the workflow starts
+failing (check the Actions tab - most likely cause is the API key secret
+being missing/expired).
+
+**To run it locally instead** (e.g. to preview a change to `render_page.py`
+before pushing):
+```powershell
+$env:TWELVE_DATA_API_KEY = "your-key-here"
+python stocks/fetch_prices.py
+python stocks/render_page.py
+# then open docs/index.html directly in a browser
+```
+
+**Ticker mapping** (`TICKERS` in `stocks/fetch_prices.py`): plain US-listed
+symbols for all five (ASML, GOOGL, MSFT, TSM, VRT) - unlike the main
+dashboard's P/E calculation, a price chart has no EPS to currency-match, so
+there's no reason to deal with ASML's Euronext listing or exchange codes
+here. Add a company by adding a `"Company Name": "TICKER"` entry.
+
 ## Project layout
 
 ```
@@ -167,5 +217,12 @@ dashboard/
   data/
     parsed/           one JSON per source document + index.json (the incremental cache)
     qoq/              the three files the dashboard reads
+  stocks/
+    fetch_prices.py   Twelve Data -> stocks/data/prices.json
+    render_page.py    prices.json -> docs/index.html
+  docs/
+    index.html         the GitHub Pages site (generated - don't hand-edit)
+  .github/workflows/
+    update_stocks.yml  daily cron: runs fetch_prices.py + render_page.py, commits & pushes
   requirements.txt
 ```
